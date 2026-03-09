@@ -29,7 +29,7 @@ repositories {
 ### 3-2. 의존성 추가 (v0.2.0 기준)
 ```gradle
 dependencies {
-    implementation 'com.github.da-bom:lib-kafka:v0.2.0'
+    implementation 'com.github.da-bom:lib-kafka:v0.2.1'
 }
 ```
 
@@ -72,7 +72,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.da-bom:lib-kafka:0.2.0'
+    implementation 'com.github.da-bom:lib-kafka:0.2.1'
 }
 ```
 
