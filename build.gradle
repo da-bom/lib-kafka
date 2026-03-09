@@ -1,10 +1,11 @@
 plugins {
     id 'java-library'
+    id 'maven-publish'
     id 'io.spring.dependency-management' version '1.1.6'
 }
 
-group = 'com.github.dabom'
-version = '0.1.0'
+group = findProperty('group') ?: 'com.github.ChoiSeungeon'
+version = findProperty('version') ?: '0.1.2'
 
 java {
     toolchain {
@@ -16,13 +17,6 @@ java {
 
 repositories {
     mavenCentral()
-}
-
-dependencyManagement {
-    imports {
-        mavenBom 'org.springframework.boot:spring-boot-dependencies:3.4.0'
-        mavenBom 'io.opentelemetry:opentelemetry-bom:1.44.1'
-    }
 }
 
 dependencies {
@@ -40,6 +34,26 @@ dependencies {
     testImplementation 'org.springframework.kafka:spring-kafka-test'
 }
 
+dependencyManagement {
+    imports {
+        mavenBom 'org.springframework.boot:spring-boot-dependencies:3.4.0'
+        mavenBom 'io.opentelemetry:opentelemetry-bom:1.44.1'
+    }
+}
+
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifactId = 'dabom-kafka-common'
+        }
+    }
+}
+
+tasks.withType(org.gradle.api.publish.tasks.GenerateModuleMetadata).configureEach {
+    suppressedValidationErrors.add('dependencies-without-versions')
 }

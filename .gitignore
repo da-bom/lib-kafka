@@ -1,2 +1,17 @@
 /build/
 /.gradle/
+
+# IntelliJ IDEA
+/.idea/
+*.iml
+*.ipr
+*.iws
+
+# Java / Gradle outputs
+out/
+target/
+*.class
+
+# OS files
+.DS_Store
+Thumbs.db
