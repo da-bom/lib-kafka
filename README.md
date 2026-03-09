@@ -1,4 +1,4 @@
-﻿# dabom-kafka-common
+﻿# lib-kafka
 
 Spring Kafka 기반 서비스에서 반복되는 설정/에러처리/관측성 코드를 공통화한 라이브러리입니다.
 
@@ -26,10 +26,10 @@ repositories {
 }
 ```
 
-### 3-2. 의존성 추가 (v0.1.3 기준)
+### 3-2. 의존성 추가 (v0.2.0 기준)
 ```gradle
 dependencies {
-    implementation 'com.github.ChoiSeungeon:dabom-kafka-common:v0.1.3'
+    implementation 'com.github.da-bom:lib-kafka:v0.2.0'
 }
 ```
 
@@ -50,7 +50,7 @@ public class UsageApplication {}
 ```
 
 ## 4) 운영/버전 정책
-- 태그 버전 고정 사용: `v0.1.3`, `v0.1.4` 같은 방식
+- 태그 버전 고정 사용: `v0.2.0`, `v0.2.1` 같은 방식
 - 기존 태그 재사용 금지: 변경 시 반드시 새 태그 발행
 - 브레이킹 변경(호환 불가 API/동작 변경)은 메이저 버전 업
 - 패치/기능 추가는 마이너/패치 올리고 새 태그 발행
@@ -72,7 +72,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.ChoiSeungeon:dabom-kafka-common:0.1.3'
+    implementation 'com.github.da-bom:lib-kafka:0.2.0'
 }
 ```
 
@@ -93,3 +93,4 @@ dependencies {
 스모크 테스트 권장:
 - 소비 프로젝트에서 라이브러리 클래스 import 확인
 - Kafka 송신 1건 + 소비 1건으로 listener/metrics/error handler 빈 로딩 확인
+
