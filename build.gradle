@@ -5,7 +5,7 @@ plugins {
 }
 
 group = findProperty('group') ?: 'com.github.da-bom'
-version = findProperty('version') ?: '0.2.0'
+version = findProperty('version') ?: '0.4.0'
 
 java {
     toolchain {
@@ -23,7 +23,6 @@ dependencies {
     api 'org.springframework.kafka:spring-kafka'
     implementation 'org.springframework:spring-context'
     implementation 'io.micrometer:micrometer-core'
-    implementation 'io.opentelemetry:opentelemetry-api'
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'org.slf4j:slf4j-api'
 
@@ -37,7 +36,6 @@ dependencies {
 dependencyManagement {
     imports {
         mavenBom 'org.springframework.boot:spring-boot-dependencies:3.4.0'
-        mavenBom 'io.opentelemetry:opentelemetry-bom:1.44.1'
     }
 }
 
