@@ -7,6 +7,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.dabom.messaging.kafka.contract.KafkaEventTypes;
 import com.dabom.messaging.kafka.event.dto.notification.NotificationPayload;
 import com.dabom.messaging.kafka.event.dto.policy.PolicyUpdatedPayload;
 import com.dabom.messaging.kafka.event.dto.usage.UsagePayload;
@@ -26,11 +27,11 @@ public record EventEnvelope<T>(
                         property = "eventType",
                         defaultImpl = Void.class)
                 @JsonSubTypes({
-                    @JsonSubTypes.Type(value = UsagePayload.class, name = "DATA_USAGE"),
-                    @JsonSubTypes.Type(value = PolicyUpdatedPayload.class, name = "POLICY_UPDATED"),
-                    @JsonSubTypes.Type(value = UsagePersistPayload.class, name = "USAGE_PERSIST"),
-                    @JsonSubTypes.Type(value = NotificationPayload.class, name = "NOTIFICATION"),
-                    @JsonSubTypes.Type(value = UsageRealtimePayload.class, name = "USAGE_REALTIME")
+                    @JsonSubTypes.Type(value = UsagePayload.class, name = KafkaEventTypes.DATA_USAGE),
+                    @JsonSubTypes.Type(value = PolicyUpdatedPayload.class, name = KafkaEventTypes.POLICY_UPDATED),
+                    @JsonSubTypes.Type(value = UsagePersistPayload.class, name = KafkaEventTypes.USAGE_PERSIST),
+                    @JsonSubTypes.Type(value = NotificationPayload.class, name = KafkaEventTypes.NOTIFICATION),
+                    @JsonSubTypes.Type(value = UsageRealtimePayload.class, name = KafkaEventTypes.USAGE_REALTIME)
                 })
                 T payload) {
     // subType이 필요 없는 이벤트를 위한 기본 생성 헬퍼다.
