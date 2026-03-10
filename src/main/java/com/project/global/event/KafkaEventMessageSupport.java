@@ -79,4 +79,12 @@ public class KafkaEventMessageSupport {
             throw new KafkaMessageProcessingException("Failed to handle kafka event", e);
         }
     }
+
+    public String serialize(EventEnvelope<?> envelope) {
+        try {
+            return objectMapper.writeValueAsString(envelope);
+        } catch (JsonProcessingException e) {
+            throw new KafkaMessageProcessingException("Failed to serialize event", e);
+        }
+    }
 }
