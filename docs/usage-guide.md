@@ -16,7 +16,7 @@
 예시:
 
 ```gradle
-implementation 'com.github.da-bom:lib-kafka:v0.4.0'
+implementation 'com.github.da-bom:lib-kafka:v0.5.0'
 ```
 
 ## 2. 설치
@@ -34,7 +34,7 @@ repositories {
 
 ```gradle
 dependencies {
-    implementation 'com.github.da-bom:lib-kafka:v0.4.0'
+    implementation 'com.github.da-bom:lib-kafka:v0.5.0'
 }
 ```
 
@@ -98,7 +98,26 @@ app:
         max-interval-ms: 10000
 ```
 
-## 5. 이벤트 계약 사용법
+## 5. 공통 계약 상수
+
+문자열 리터럴 대신 아래 상수들을 사용하는 것을 권장한다.
+
+- `com.dabom.messaging.kafka.contract.KafkaTopics`
+- `com.dabom.messaging.kafka.contract.KafkaEventTypes`
+- `com.dabom.messaging.kafka.contract.KafkaConsumerGroups`
+- `com.dabom.messaging.kafka.event.dto.notification.NotificationSubTypes`
+
+예:
+
+```java
+kafkaEventPublisher.publish(
+        KafkaTopics.USAGE_PERSIST,
+        KafkaEventTypes.USAGE_PERSIST,
+        payload
+);
+```
+
+## 6. 이벤트 계약 사용법
 
 ### `EventEnvelope<T>`
 
@@ -120,14 +139,17 @@ app:
 
 ```java
 EventEnvelope<UsageRealtimePayload> envelope =
-        EventEnvelope.of("USAGE_REALTIME", payload);
+        EventEnvelope.of(KafkaEventTypes.USAGE_REALTIME, payload);
 ```
 
 subType이 필요한 경우:
 
 ```java
 EventEnvelope<NotificationPayload> envelope =
-        EventEnvelope.of("NOTIFICATION", "QUOTA_UPDATED", payload);
+        EventEnvelope.of(
+                KafkaEventTypes.NOTIFICATION,
+                NotificationSubTypes.QUOTA_UPDATED,
+                payload);
 ```
 
 ### 내장 payload 타입
@@ -140,7 +162,31 @@ EventEnvelope<NotificationPayload> envelope =
 
 이들은 예시 DTO가 아니라 조직 공통 이벤트 계약으로 취급한다.
 
-## 6. `KafkaEventMessageSupport` 사용법
+## 7. `NotificationEventSupport` 사용법
+
+위치:
+
+- `com.dabom.messaging.kafka.event.dto.notification.NotificationEventSupport`
+
+제공 기능:
+
+- `resolveSubType(NotificationPayload payload)`
+- `toEnvelope(NotificationPayload payload)`
+
+notification 이벤트는 payload 타입에 따라 subType이 고정되므로, 서비스에서 switch를 반복하지 말고 이 helper를 사용하는 것을 권장한다.
+
+예시:
+
+```java
+String subType = NotificationEventSupport.resolveSubType(payload);
+```
+
+```java
+EventEnvelope<NotificationPayload> envelope =
+        NotificationEventSupport.toEnvelope(payload);
+```
+
+## 8. `KafkaEventMessageSupport` 사용법
 
 위치:
 
@@ -157,11 +203,13 @@ EventEnvelope<NotificationPayload> envelope =
 ### 소비 예시
 
 ```java
-@KafkaListener(topics = "usage-events", groupId = "usage-consumer")
+@KafkaListener(
+        topics = KafkaTopics.USAGE_EVENTS,
+        groupId = KafkaConsumerGroups.DABOM_API_CORE_REALTIME)
 public void consume(ConsumerRecord<String, String> record) {
     kafkaEventMessageSupport.consumeByEventType(
             record,
-            "USAGE_REALTIME",
+            KafkaEventTypes.USAGE_REALTIME,
             new TypeReference<EventEnvelope<UsageRealtimePayload>>() {},
             (envelope, key) -> usageService.handle(envelope.payload(), key)
     );
@@ -172,13 +220,13 @@ public void consume(ConsumerRecord<String, String> record) {
 
 ```java
 EventEnvelope<NotificationPayload> envelope =
-        EventEnvelope.of("NOTIFICATION", "QUOTA_UPDATED", payload);
+        NotificationEventSupport.toEnvelope(payload);
 
 String message = kafkaEventMessageSupport.serialize(envelope);
-kafkaTemplate.send("notification-events", message);
+kafkaTemplate.send(KafkaTopics.NOTIFICATION, message);
 ```
 
-## 7. `KafkaEventPublisher` 사용법
+## 9. `KafkaEventPublisher` 사용법
 
 위치:
 
@@ -190,50 +238,40 @@ kafkaTemplate.send("notification-events", message);
 
 이 인터페이스를 쓰면 서비스 코드에서 `EventEnvelope` 생성, 직렬화, `KafkaTemplate` 전송을 한 곳으로 모을 수 있다.
 
-### 실제 서비스 예시
+### 실제 서비스 예시 1: 단순 이벤트 발행
+
+```java
+@Service
+@RequiredArgsConstructor
+public class UsagePersistEventPublishService {
+    private final KafkaEventPublisher kafkaEventPublisher;
+
+    public void publish(UsagePersistPayload payload) {
+        kafkaEventPublisher.publish(
+                KafkaTopics.USAGE_PERSIST,
+                KafkaEventTypes.USAGE_PERSIST,
+                payload);
+    }
+}
+```
+
+### 실제 서비스 예시 2: notification 발행
 
 ```java
 @Service
 @RequiredArgsConstructor
 public class NotificationEventPublishService {
-    private static final String TOPIC = "notification-events";
-    private static final String EVENT_TYPE = "NOTIFICATION";
-
     private final KafkaEventPublisher kafkaEventPublisher;
 
     public void publish(NotificationPayload payload) {
-        String subType =
-                switch (payload) {
-                    case QuotaUpdatedPayload ignored -> "QUOTA_UPDATED";
-                    case CustomerBlockedPayload ignored -> "CUSTOMER_BLOCKED";
-                    case ThresholdAlertPayload ignored -> "THRESHOLD_ALERT";
-                };
-
-        kafkaEventPublisher.publish(TOPIC, EVENT_TYPE, subType, payload);
+        kafkaEventPublisher.publish(
+                KafkaTopics.NOTIFICATION,
+                NotificationEventSupport.toEnvelope(payload));
     }
 }
 ```
 
-이미 만들어진 envelope를 그대로 보내는 방식도 가능하다.
-
-```java
-@Service
-@RequiredArgsConstructor
-public class UsageEventPublishService {
-    private static final String TOPIC = "usage-events";
-
-    private final KafkaEventPublisher kafkaEventPublisher;
-
-    public void publish(UsageRealtimePayload payload) {
-        EventEnvelope<UsageRealtimePayload> envelope =
-                EventEnvelope.of("USAGE_REALTIME", payload);
-
-        kafkaEventPublisher.publish(TOPIC, envelope);
-    }
-}
-```
-
-## 8. `KafkaEventConsumer<T>` 사용법
+## 10. `KafkaEventConsumer<T>` 사용법
 
 위치:
 
@@ -252,7 +290,7 @@ public class UsageRealtimeConsumer implements KafkaEventConsumer<UsageRealtimePa
 
     @Override
     public String eventType() {
-        return "USAGE_REALTIME";
+        return KafkaEventTypes.USAGE_REALTIME;
     }
 
     @Override
@@ -278,20 +316,16 @@ public class UsageRealtimeKafkaListener {
     private final KafkaEventMessageSupport kafkaEventMessageSupport;
     private final UsageRealtimeConsumer usageRealtimeConsumer;
 
-    @KafkaListener(topics = "usage-events", groupId = "usage-consumer")
+    @KafkaListener(
+            topics = KafkaTopics.USAGE_EVENTS,
+            groupId = KafkaConsumerGroups.DABOM_API_CORE_REALTIME)
     public void consume(ConsumerRecord<String, String> record) {
         usageRealtimeConsumer.consume(record, kafkaEventMessageSupport);
     }
 }
 ```
 
-이 패턴의 장점은 다음과 같다.
-
-- listener는 Kafka adapter 역할만 담당한다.
-- 실제 eventType 계약과 처리 로직은 `KafkaEventConsumer<T>` 구현체에 모인다.
-- 테스트할 때 `handle(...)` 단위와 listener wiring 단위를 분리할 수 있다.
-
-## 9. 메트릭
+## 11. 메트릭
 
 ### 제공 구성
 
@@ -317,7 +351,7 @@ public class UsageRealtimeKafkaListener {
 - `group`
 - `eventType`
 
-## 10. 에러 관련 타입
+## 12. 에러 관련 타입
 
 ### 위치
 
@@ -337,7 +371,7 @@ public class UsageRealtimeKafkaListener {
 - 파싱/역직렬화 실패는 `KafkaMessageDeserializationException`
 - 비즈니스 처리 실패는 `KafkaMessageProcessingException`
 
-## 11. 현재 제외된 기능
+## 13. 현재 제외된 기능
 
 이 버전에서는 tracing 지원이 라이브러리에 포함되지 않는다.
 
@@ -347,14 +381,14 @@ public class UsageRealtimeKafkaListener {
 
 즉, OpenTelemetry 전파는 각 서비스가 별도로 구성해야 한다.
 
-## 12. 운영 권장사항
+## 14. 운영 권장사항
 
 - 태그는 항상 고정 버전을 사용한다.
 - 기존 태그를 덮어쓰지 않는다.
 - 브레이킹 체인지는 새 버전으로 올린다.
 - 배포 전 최소 `./gradlew test`는 실행한다.
 
-## 13. 서비스 전용 Kafka 설정 확장
+## 15. 서비스 전용 Kafka 설정 확장
 
 서비스마다 Kafka 설정을 조금씩 다르게 가져가야 할 수도 있다.
 현재 구조에서도 가능하지만, 공통 빈을 무작정 덮어쓰기보다 "서비스 전용 빈을 별도 이름으로 추가"하는 방식을 권장한다.
@@ -365,9 +399,7 @@ public class UsageRealtimeKafkaListener {
 - 서비스 고유 요구사항은 별도 이름의 Bean으로 추가
 - 필요한 listener나 publisher에서 명시적으로 그 Bean을 사용
 
-### 예시 1: 서비스 전용 listener container factory
-
-특정 consumer만 concurrency를 다르게 주고 싶을 때:
+### 예시: 서비스 전용 listener container factory
 
 ```java
 @Configuration
@@ -388,60 +420,17 @@ public class UsageConsumerKafkaConfig {
 }
 ```
 
-사용 예시:
-
 ```java
 @KafkaListener(
-        topics = "usage-events",
-        groupId = "usage-consumer",
+        topics = KafkaTopics.USAGE_EVENTS,
+        groupId = KafkaConsumerGroups.DABOM_API_CORE_REALTIME,
         containerFactory = "usageKafkaListenerContainerFactory")
 public void consume(ConsumerRecord<String, String> record) {
     usageRealtimeConsumer.consume(record, kafkaEventMessageSupport);
 }
 ```
 
-### 예시 2: 서비스 전용 KafkaTemplate
-
-특정 발행 흐름만 별도 producer 설정을 쓰고 싶을 때:
-
-```java
-@Configuration
-public class NotificationProducerKafkaConfig {
-    @Bean
-    public KafkaTemplate<String, String> notificationKafkaTemplate(
-            ProducerFactory<String, String> producerFactory) {
-        KafkaTemplate<String, String> kafkaTemplate = new KafkaTemplate<>(producerFactory);
-        kafkaTemplate.setObservationEnabled(true);
-        return kafkaTemplate;
-    }
-}
-```
-
-이 경우 서비스 전용 publisher 구현체에서 해당 Bean을 주입받아 사용할 수 있다.
-
-### 피하는 것이 좋은 방식
-
-- 라이브러리가 이미 등록한 공통 Bean과 같은 이름으로 다시 등록
-- 이유 없이 기본 `KafkaTemplate`, `CommonErrorHandler`를 전부 덮어쓰기
-- 서비스 고유 설정과 공통 정책을 한 클래스에 섞어 넣기
-
-### 판단 기준
-
-아래는 서비스에서 따로 가져가도 괜찮은 편이다.
-
-- 특정 listener의 concurrency
-- 특정 listener의 container factory
-- 특정 producer용 topic routing
-- 서비스 고유 interceptor
-
-반대로 아래는 가능하면 공통 표준으로 유지하는 편이 낫다.
-
-- 기본 envelope 직렬화 규칙
-- 공통 에러 분류 체계
-- 공통 DLT 정책
-- 공통 메트릭 이름과 태그 정책
-
-## 14. 트러블슈팅
+## 16. 트러블슈팅
 
 ### 빈이 잡히지 않을 때
 

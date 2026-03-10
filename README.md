@@ -26,10 +26,10 @@ repositories {
 }
 ```
 
-### 3-2. 의존성 추가 (v0.4.0 기준)
+### 3-2. 의존성 추가 (v0.5.0 기준)
 ```gradle
 dependencies {
-    implementation 'com.github.da-bom:lib-kafka:v0.4.0'
+    implementation 'com.github.da-bom:lib-kafka:v0.5.0'
 }
 ```
 
@@ -50,7 +50,7 @@ public class UsageApplication {}
 ```
 
 ## 4) 운영/버전 정책
-- 태그 버전 고정 사용: `v0.4.0` 같은 방식
+- 태그 버전 고정 사용: `v0.5.0` 같은 방식
 - 기존 태그 재사용 금지: 변경 시 반드시 새 태그 발행
 - 브레이킹 변경(호환 불가 API/동작 변경)은 메이저 버전 업
 - 패치/기능 추가는 마이너/패치 올리고 새 태그 발행
@@ -72,7 +72,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.da-bom:lib-kafka:v0.4.0'
+    implementation 'com.github.da-bom:lib-kafka:v0.5.0'
 }
 ```
 
@@ -93,6 +93,7 @@ dependencies {
 스모크 테스트 권장:
 - 소비 프로젝트에서 라이브러리 클래스 import 확인
 - Kafka 송신 1건 + 소비 1건으로 listener/metrics/error handler 빈 로딩 확인
+
 
 
 
