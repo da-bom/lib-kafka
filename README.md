@@ -1,17 +1,17 @@
 ﻿# lib-kafka
 
-Spring Kafka 기반 서비스에서 반복되는 설정/에러처리/관측성 코드를 공통화한 라이브러리입니다.
+Spring Kafka 기반 서비스에서 반복되는 설정, 에러 처리, 이벤트 계약, 메트릭 코드를 공통화한 라이브러리입니다.
 
 ## 1) 이 라이브러리가 해결하는 문제
-- 서비스마다 중복되던 Kafka 설정, 에러 핸들링, 메트릭, 트레이싱 코드를 공통 모듈로 통합
+- 서비스마다 중복되던 Kafka 설정, 에러 핸들링, 메트릭 코드를 공통 모듈로 통합
 - 이벤트 엔벨로프(`EventEnvelope`)와 DTO 파싱 패턴을 표준화
 - 운영 시 장애 대응(DLT, 재시도, 메트릭) 동작을 일관되게 유지
 
 ## 2) 지원 범위
-- `config`: Kafka Producer/Consumer Factory, Listener Container, Common Error Handler
+- `autoconfigure`: Kafka Producer/Consumer Factory, Listener Container, Common Error Handler
 - `error`: 예외 분류기, 도메인 예외, 액션/코드 모델
 - `metrics`: Producer/Consumer 메트릭, 인터셉터/리스너
-- `tracing`: OpenTelemetry context 전파 및 span 헬퍼
+
 - `event`: `EventEnvelope`, DTO, 이벤트 타입 기반 소비 헬퍼
 
 상세는 [usage-guide](docs/usage-guide.md), 전환 절차는 [migration-guide](docs/migration-guide.md) 참고.
@@ -26,17 +26,17 @@ repositories {
 }
 ```
 
-### 3-2. 의존성 추가 (v0.2.0 기준)
+### 3-2. 의존성 추가 (v0.4.0 기준)
 ```gradle
 dependencies {
-    implementation 'com.github.da-bom:lib-kafka:v0.2.1'
+    implementation 'com.github.da-bom:lib-kafka:v0.4.0'
 }
 ```
 
 주의: 운영에서는 항상 고정 태그 사용. 새 릴리즈가 나오면 태그만 올려 교체하세요.
 
 ### 3-3. 스프링 자동 인식(컴포넌트 스캔) 조건
-라이브러리 클래스 패키지는 `com.project.global` 입니다.
+라이브러리 클래스 패키지는 `com.dabom.messaging.kafka` 입니다.
 
 - 애플리케이션의 `@SpringBootApplication` 루트 패키지가 `com.project` 하위면 기본 스캔으로 인식
 - 루트 패키지가 다르면 명시적으로 스캔 범위를 추가
@@ -44,13 +44,13 @@ dependencies {
 ```java
 @SpringBootApplication(scanBasePackages = {
     "com.myservice",
-    "com.project.global"
+    "com.dabom.messaging.kafka"
 })
 public class UsageApplication {}
 ```
 
 ## 4) 운영/버전 정책
-- 태그 버전 고정 사용: `v0.2.0`, `v0.2.1` 같은 방식
+- 태그 버전 고정 사용: `v0.4.0` 같은 방식
 - 기존 태그 재사용 금지: 변경 시 반드시 새 태그 발행
 - 브레이킹 변경(호환 불가 API/동작 변경)은 메이저 버전 업
 - 패치/기능 추가는 마이너/패치 올리고 새 태그 발행
@@ -72,7 +72,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.da-bom:lib-kafka:0.2.1'
+    implementation 'com.github.da-bom:lib-kafka:v0.4.0'
 }
 ```
 
@@ -81,7 +81,7 @@ dependencies {
 의존성으로 받은 jar 내부 클래스이기 때문입니다. IDE가 Maven/Gradle 캐시에서 클래스를 인덱싱해 import를 제공합니다.
 
 ### Q2. 패키지가 `com.project`가 아니면 어떻게 인식시키나요?
-`@SpringBootApplication(scanBasePackages = {"내 패키지", "com.project.global"})` 형태로 스캔 범위를 추가하세요.
+`@SpringBootApplication(scanBasePackages = {"내 패키지", "com.dabom.messaging.kafka"})` 형태로 스캔 범위를 추가하세요.
 
 ## 7) 빠른 점검 체크리스트
 ```bash
@@ -93,4 +93,6 @@ dependencies {
 스모크 테스트 권장:
 - 소비 프로젝트에서 라이브러리 클래스 import 확인
 - Kafka 송신 1건 + 소비 1건으로 listener/metrics/error handler 빈 로딩 확인
+
+
 
