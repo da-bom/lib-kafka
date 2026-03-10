@@ -53,7 +53,7 @@ com.dabom.messaging.kafka
 |  |- consumer
 |  `- producer
 `- support
-   `- LogSanitizer
+   `- KafkaLogSanitizer
 ```
 
 ## 이렇게 나눈 이유

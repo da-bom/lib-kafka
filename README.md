@@ -60,8 +60,6 @@ public class UsageApplication {}
   - `KafkaTopics`, `KafkaEventTypes`, `KafkaConsumerGroups` 추가
   - `NotificationSubTypes`, `NotificationEventSupport` 추가
   - topic / eventType / consumer group / notification subtype 계약 중앙화
-- `v0.4.1`
-  - `UsageRealtimePayload` 계약 오류 수정
 - `v0.4.0`
   - 패키지 구조를 `com.dabom.messaging.kafka` 기준으로 재정리
   - `KafkaEventPublisher`, `DefaultKafkaEventPublisher`, `KafkaEventConsumer<T>` 추가

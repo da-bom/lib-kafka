@@ -12,7 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.dabom.messaging.kafka.event.dto.EventEnvelope;
 import com.dabom.messaging.kafka.error.KafkaMessageDeserializationException;
 import com.dabom.messaging.kafka.error.KafkaMessageProcessingException;
-import com.dabom.messaging.kafka.support.LogSanitizer;
+import com.dabom.messaging.kafka.support.KafkaLogSanitizer;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +24,7 @@ public class KafkaEventMessageSupport {
     private static final String EVENT_TYPE_FIELD = "eventType";
 
     private final ObjectMapper objectMapper;
-    private final LogSanitizer logSanitizer;
+    private final KafkaLogSanitizer logSanitizer;
 
     public JsonNode readTree(String rawMessage) throws JsonProcessingException {
         return objectMapper.readTree(rawMessage);
