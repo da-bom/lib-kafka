@@ -55,7 +55,21 @@ public class UsageApplication {}
 - 브레이킹 변경(호환 불가 API/동작 변경)은 메이저 버전 업
 - 패치/기능 추가는 마이너/패치 올리고 새 태그 발행
 
-## 5) 장애 대응: JitPack 이슈 시 fallback
+## 5) 버전별 변경 요약
+- `v0.5.0`
+  - `KafkaTopics`, `KafkaEventTypes`, `KafkaConsumerGroups` 추가
+  - `NotificationSubTypes`, `NotificationEventSupport` 추가
+  - topic / eventType / consumer group / notification subtype 계약 중앙화
+- `v0.4.1`
+  - `UsageRealtimePayload` 계약 오류 수정
+- `v0.4.0`
+  - 패키지 구조를 `com.dabom.messaging.kafka` 기준으로 재정리
+  - `KafkaEventPublisher`, `DefaultKafkaEventPublisher`, `KafkaEventConsumer<T>` 추가
+  - tracing 지원 제거
+- `v0.3.x` 이하
+  - 초기 공통 Kafka 설정, 이벤트 envelope, 에러 처리, 메트릭 기능 제공
+
+## 6) 장애 대응: JitPack 이슈 시 fallback
 JitPack 장애/지연 시 `mavenLocal`로 임시 검증 가능합니다.
 
 라이브러리 프로젝트에서:
@@ -76,14 +90,14 @@ dependencies {
 }
 ```
 
-## 6) FAQ
+## 7) FAQ
 ### Q1. 왜 내 로컬 코드에 클래스가 없어도 import가 되나요?
 의존성으로 받은 jar 내부 클래스이기 때문입니다. IDE가 Maven/Gradle 캐시에서 클래스를 인덱싱해 import를 제공합니다.
 
 ### Q2. 패키지가 `com.project`가 아니면 어떻게 인식시키나요?
 `@SpringBootApplication(scanBasePackages = {"내 패키지", "com.dabom.messaging.kafka"})` 형태로 스캔 범위를 추가하세요.
 
-## 7) 빠른 점검 체크리스트
+## 8) 빠른 점검 체크리스트
 ```bash
 ./gradlew clean compileJava
 ./gradlew clean test
