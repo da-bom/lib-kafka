@@ -5,8 +5,6 @@ public final class KafkaConsumerGroups {
             "dabom-processor-usage-main-group";
     public static final String DABOM_PROCESSOR_USAGE_POLICY =
             "dabom-processor-usage-policy-group";
-    public static final String DABOM_PROCESSOR_USAGE_PERSISTENCE =
-            "dabom-processor-usage-persistence-group";
     public static final String DABOM_API_CORE_REALTIME =
             "dabom-api-core-realtime-group";
     public static final String DABOM_NOTIFICATION_SENDER =

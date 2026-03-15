@@ -12,7 +12,6 @@ public final class KafkaMetricTagSanitizer {
             Set.of(
                     KafkaEventTypes.DATA_USAGE,
                     KafkaEventTypes.POLICY_UPDATED,
-                    KafkaEventTypes.USAGE_PERSIST,
                     KafkaEventTypes.NOTIFICATION,
                     KafkaEventTypes.USAGE_REALTIME);
 
