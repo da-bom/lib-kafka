@@ -1,47 +1,21 @@
-﻿# 사용 가이드
+# Usage Guide
 
-이 문서는 `lib-kafka`를 서비스에 적용할 때 필요한 기본 사용법을 정리한다.
-에러 처리 기준은 [error-handling-policy.md](./error-handling-policy.md)를 따른다.
+이 문서는 `lib-kafka v1.0.0`을 서비스에서 사용하는 기본 방법을 정리한다.
 
-## 1. 기본 정보
-
-- Group: `com.github.da-bom`
-- Artifact: `lib-kafka`
-- Java: 21
-- Gradle Wrapper: 8.10.2
-- 루트 패키지: `com.dabom.messaging.kafka`
-
-버전은 항상 고정 태그를 사용한다.
-
-예시:
-
-```gradle
-implementation 'com.github.da-bom:lib-kafka:v0.5.0'
-```
-
-## 2. 설치
-
-### 2.1 JitPack 저장소 추가
+## 1. 설치
 
 ```gradle
 repositories {
     mavenCentral()
     maven { url 'https://jitpack.io' }
 }
-```
 
-### 2.2 의존성 추가
-
-```gradle
 dependencies {
-    implementation 'com.github.da-bom:lib-kafka:v0.5.0'
+    implementation 'com.github.da-bom:lib-kafka:v1.0.0'
 }
 ```
 
-## 3. 스프링에서 인식시키기
-
-라이브러리 빈은 `com.dabom.messaging.kafka` 하위에 있다.
-애플리케이션 루트 패키지가 다르면 component scan 범위를 추가해야 한다.
+애플리케이션 루트 패키지가 다르면 component scan 범위를 추가한다.
 
 ```java
 @SpringBootApplication(scanBasePackages = {
@@ -51,211 +25,96 @@ dependencies {
 public class Application {}
 ```
 
-## 4. 자동 설정으로 제공되는 것
-
-### `autoconfigure.KafkaConfig`
-
-다음 빈을 기본으로 제공한다.
+## 2. 자동 설정으로 제공되는 것
 
 - `ProducerFactory<String, String>`
 - `KafkaTemplate<String, String>`
 - `ConsumerFactory<String, String>`
 - `ConcurrentKafkaListenerContainerFactory<String, String>`
+- `CommonErrorHandler`
 
-특징:
+producer 기본값:
 
-- producer/consumer 모두 문자열 payload를 기준으로 동작한다.
-- listener container에는 metrics interceptor와 공통 error handler가 연결된다.
-- `KafkaTemplate`에는 producer metrics listener가 연결된다.
+- `acks=all`
+- `enable.idempotence=true`
 
-기본 프로퍼티 예시:
+## 3. 공통 계약 상수
 
-```yaml
-spring:
-  kafka:
-    bootstrap-servers: localhost:9092
-```
+문자열 리터럴 대신 아래 상수를 사용한다.
 
-### `autoconfigure.KafkaErrorHandlerConfig`
-
-다음 역할을 담당한다.
-
-- 예외를 `RETRY`, `IGNORE`, `DLQ`로 분류
-- DLT 발행
-- 재시도 backoff 적용
-- invalid/retry/dlt 메트릭 집계
-
-기본 재시도 관련 프로퍼티:
-
-```yaml
-app:
-  kafka:
-    error-handler:
-      retry:
-        max-attempts: 2
-        initial-interval-ms: 1000
-        multiplier: 2.0
-        max-interval-ms: 10000
-```
-
-## 5. 공통 계약 상수
-
-문자열 리터럴 대신 아래 상수들을 사용하는 것을 권장한다.
-
-- `com.dabom.messaging.kafka.contract.KafkaTopics`
-- `com.dabom.messaging.kafka.contract.KafkaEventTypes`
-- `com.dabom.messaging.kafka.contract.KafkaConsumerGroups`
-- `com.dabom.messaging.kafka.event.dto.notification.NotificationSubTypes`
+- `KafkaTopics`
+- `KafkaEventTypes`
+- `KafkaConsumerGroups`
+- `NotificationType`
 
 예:
 
 ```java
 kafkaEventPublisher.publish(
-        KafkaTopics.USAGE_PERSIST,
-        KafkaEventTypes.USAGE_PERSIST,
-        payload
-);
+        KafkaTopics.USAGE_REALTIME,
+        KafkaEventTypes.USAGE_REALTIME,
+        payload);
 ```
 
-## 6. 이벤트 계약 사용법
+## 4. EventEnvelope 사용
 
-### `EventEnvelope<T>`
+기본 메시지 포맷은 `EventEnvelope<T>`다.
 
-이 라이브러리의 기본 메시지 포맷은 `EventEnvelope<T>`다.
-
-위치:
-
-- `com.dabom.messaging.kafka.event.dto.EventEnvelope`
-
-주요 필드:
+필드:
 
 - `eventId`
 - `eventType`
-- `subType`
 - `timestamp`
 - `payload`
 
-생성 예시:
+생성 예:
 
 ```java
 EventEnvelope<UsageRealtimePayload> envelope =
         EventEnvelope.of(KafkaEventTypes.USAGE_REALTIME, payload);
 ```
 
-subType이 필요한 경우:
+## 5. NotificationPayload 사용
+
+notification은 단일 payload 구조를 사용한다.
 
 ```java
-EventEnvelope<NotificationPayload> envelope =
-        EventEnvelope.of(
-                KafkaEventTypes.NOTIFICATION,
-                NotificationSubTypes.QUOTA_UPDATED,
-                payload);
+NotificationPayload payload = new NotificationPayload(
+        familyId,
+        customerId,
+        NotificationType.THRESHOLD_ALERT,
+        "데이터 잔여량 알림",
+        "잔여량이 10% 남았습니다.",
+        Map.of("thresholdPercent", 10, "remainingMb", 512));
 ```
 
-### 내장 payload 타입
-
-현재 중앙 관리하는 payload 카테고리는 다음과 같다.
-
-- `event.dto.notification`
-- `event.dto.policy`
-- `event.dto.usage`
-
-이들은 예시 DTO가 아니라 조직 공통 이벤트 계약으로 취급한다.
-
-## 7. `NotificationEventSupport` 사용법
-
-위치:
-
-- `com.dabom.messaging.kafka.event.dto.notification.NotificationEventSupport`
-
-제공 기능:
-
-- `resolveSubType(NotificationPayload payload)`
-- `toEnvelope(NotificationPayload payload)`
-
-notification 이벤트는 payload 타입에 따라 subType이 고정되므로, 서비스에서 switch를 반복하지 말고 이 helper를 사용하는 것을 권장한다.
-
-예시:
-
-```java
-String subType = NotificationEventSupport.resolveSubType(payload);
-```
+helper 사용:
 
 ```java
 EventEnvelope<NotificationPayload> envelope =
         NotificationEventSupport.toEnvelope(payload);
 ```
 
-## 8. `KafkaEventMessageSupport` 사용법
+## 6. KafkaEventPublisher 사용
 
-위치:
-
-- `com.dabom.messaging.kafka.event.KafkaEventMessageSupport`
-
-제공 기능:
-
-- raw JSON을 `JsonNode`로 파싱
-- `eventType` 추출
-- `EventEnvelope<T>`로 변환
-- `eventType` 기준 소비 분기
-- `EventEnvelope<?>` 직렬화
-
-### 소비 예시
-
-```java
-@KafkaListener(
-        topics = KafkaTopics.USAGE_EVENTS,
-        groupId = KafkaConsumerGroups.DABOM_API_CORE_REALTIME)
-public void consume(ConsumerRecord<String, String> record) {
-    kafkaEventMessageSupport.consumeByEventType(
-            record,
-            KafkaEventTypes.USAGE_REALTIME,
-            new TypeReference<EventEnvelope<UsageRealtimePayload>>() {},
-            (envelope, key) -> usageService.handle(envelope.payload(), key)
-    );
-}
-```
-
-### 발행 예시
-
-```java
-EventEnvelope<NotificationPayload> envelope =
-        NotificationEventSupport.toEnvelope(payload);
-
-String message = kafkaEventMessageSupport.serialize(envelope);
-kafkaTemplate.send(KafkaTopics.NOTIFICATION, message);
-```
-
-## 9. `KafkaEventPublisher` 사용법
-
-위치:
-
-- `com.dabom.messaging.kafka.event.publisher.KafkaEventPublisher`
-
-기본 구현:
-
-- `com.dabom.messaging.kafka.event.publisher.DefaultKafkaEventPublisher`
-
-이 인터페이스를 쓰면 서비스 코드에서 `EventEnvelope` 생성, 직렬화, `KafkaTemplate` 전송을 한 곳으로 모을 수 있다.
-
-### 실제 서비스 예시 1: 단순 이벤트 발행
+단순 이벤트 발행:
 
 ```java
 @Service
 @RequiredArgsConstructor
-public class UsagePersistEventPublishService {
+public class UsageRealtimeEventPublishService {
     private final KafkaEventPublisher kafkaEventPublisher;
 
-    public void publish(UsagePersistPayload payload) {
+    public void publish(UsageRealtimePayload payload) {
         kafkaEventPublisher.publish(
-                KafkaTopics.USAGE_PERSIST,
-                KafkaEventTypes.USAGE_PERSIST,
+                KafkaTopics.USAGE_REALTIME,
+                KafkaEventTypes.USAGE_REALTIME,
                 payload);
     }
 }
 ```
 
-### 실제 서비스 예시 2: notification 발행
+notification 발행:
 
 ```java
 @Service
@@ -271,16 +130,35 @@ public class NotificationEventPublishService {
 }
 ```
 
-## 10. `KafkaEventConsumer<T>` 사용법
+## 7. KafkaEventMessageSupport 사용
 
-위치:
+`KafkaEventMessageSupport`는 다음 역할을 담당한다.
 
-- `com.dabom.messaging.kafka.event.consumer.KafkaEventConsumer`
+- raw JSON 파싱
+- `eventType` 추출
+- `EventEnvelope<T>` 변환
+- `eventType` 기준 소비 분기
+- envelope 직렬화
 
-이 인터페이스는 서비스가 구현하는 consumer 계약이다.
-각 consumer는 자신이 처리할 `eventType`, `TypeReference`, 실제 처리 로직을 정의하면 된다.
+소비 예:
 
-### 실제 서비스 예시 1: 이벤트 처리 구현체
+```java
+@KafkaListener(
+        topics = KafkaTopics.USAGE_EVENTS,
+        groupId = KafkaConsumerGroups.DABOM_API_CORE_REALTIME)
+public void consume(ConsumerRecord<String, String> record) {
+    kafkaEventMessageSupport.consumeByEventType(
+            record,
+            KafkaEventTypes.USAGE_REALTIME,
+            new TypeReference<EventEnvelope<UsageRealtimePayload>>() {},
+            (envelope, key) -> usageService.handle(envelope.payload(), key)
+    );
+}
+```
+
+## 8. KafkaEventConsumer 사용
+
+listener는 얇게 유지하고 실제 처리 책임은 `KafkaEventConsumer<T>` 구현체에 두는 것을 권장한다.
 
 ```java
 @Component
@@ -305,144 +183,25 @@ public class UsageRealtimeConsumer implements KafkaEventConsumer<UsageRealtimePa
 }
 ```
 
-### 실제 서비스 예시 2: listener adapter
+## 9. 예외 타입 사용 규칙
 
-listener는 얇게 유지하고 실제 처리 책임은 consumer 구현체에 위임하는 방식이 자연스럽다.
+- 파싱/역직렬화 실패: `KafkaMessageDeserializationException`
+- 재시도 가능한 처리 실패: `KafkaMessageProcessingException`
+- 재시도 가치가 없는 처리 실패: `NonRetryableKafkaMessageProcessingException`
+- 계약 위반이나 검증 실패: `IllegalArgumentException`
 
-```java
-@Component
-@RequiredArgsConstructor
-public class UsageRealtimeKafkaListener {
-    private final KafkaEventMessageSupport kafkaEventMessageSupport;
-    private final UsageRealtimeConsumer usageRealtimeConsumer;
+에러 처리 상세는 [error-handling-policy.md](./error-handling-policy.md)를 따른다.
 
-    @KafkaListener(
-            topics = KafkaTopics.USAGE_EVENTS,
-            groupId = KafkaConsumerGroups.DABOM_API_CORE_REALTIME)
-    public void consume(ConsumerRecord<String, String> record) {
-        usageRealtimeConsumer.consume(record, kafkaEventMessageSupport);
-    }
-}
+## 10. 검증 체크리스트
+
+```bash
+./gradlew clean compileJava
+./gradlew clean test
+./gradlew clean publishToMavenLocal -x test
 ```
 
-## 11. 메트릭
+추가 확인:
 
-### 제공 구성
-
-- `KafkaMetrics`
-- `KafkaMetricsRecordInterceptor`
-- `KafkaMetricsProducerListener`
-- `KafkaMetricTagSanitizer`
-
-### 대표 메트릭
-
-- `kafka.producer.send.success.count`
-- `kafka.producer.send.error.count`
-- `kafka.consumer.success.count`
-- `kafka.consumer.invalid_event.count`
-- `kafka.consumer.retryable_error.count`
-- `kafka.consumer.dlt.count`
-- `kafka.consumer.processing.time`
-- `kafka.consumer.producer_to_consumer.latency`
-
-기본 태그:
-
-- `topic`
-- `group`
-- `eventType`
-
-## 12. 에러 관련 타입
-
-### 위치
-
-- `com.dabom.messaging.kafka.error`
-
-### 주요 타입
-
-- `KafkaExceptionClassifier`
-- `KafkaErrorAction`
-- `KafkaErrorCode`
-- `KafkaErrorDecision`
-- `KafkaMessageDeserializationException`
-- `KafkaMessageProcessingException`
-
-권장 방식:
-
-- 파싱/역직렬화 실패는 `KafkaMessageDeserializationException`
-- 비즈니스 처리 실패는 `KafkaMessageProcessingException`
-
-## 13. 현재 제외된 기능
-
-이 버전에서는 tracing 지원이 라이브러리에 포함되지 않는다.
-
-제거된 항목:
-
-- `KafkaTracingSupport`
-
-즉, OpenTelemetry 전파는 각 서비스가 별도로 구성해야 한다.
-
-## 14. 운영 권장사항
-
-- 태그는 항상 고정 버전을 사용한다.
-- 기존 태그를 덮어쓰지 않는다.
-- 브레이킹 체인지는 새 버전으로 올린다.
-- 배포 전 최소 `./gradlew test`는 실행한다.
-
-## 15. 서비스 전용 Kafka 설정 확장
-
-서비스마다 Kafka 설정을 조금씩 다르게 가져가야 할 수도 있다.
-현재 구조에서도 가능하지만, 공통 빈을 무작정 덮어쓰기보다 "서비스 전용 빈을 별도 이름으로 추가"하는 방식을 권장한다.
-
-### 권장 방식
-
-- 라이브러리의 기본 `KafkaTemplate`, `ConsumerFactory`, `CommonErrorHandler`는 공통 표준으로 유지
-- 서비스 고유 요구사항은 별도 이름의 Bean으로 추가
-- 필요한 listener나 publisher에서 명시적으로 그 Bean을 사용
-
-### 예시: 서비스 전용 listener container factory
-
-```java
-@Configuration
-public class UsageConsumerKafkaConfig {
-    @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, String> usageKafkaListenerContainerFactory(
-            ConsumerFactory<String, String> consumerFactory,
-            CommonErrorHandler kafkaCommonErrorHandler,
-            KafkaMetricsRecordInterceptor recordInterceptor) {
-        ConcurrentKafkaListenerContainerFactory<String, String> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(consumerFactory);
-        factory.setCommonErrorHandler(kafkaCommonErrorHandler);
-        factory.setRecordInterceptor(recordInterceptor);
-        factory.setConcurrency(5);
-        return factory;
-    }
-}
-```
-
-```java
-@KafkaListener(
-        topics = KafkaTopics.USAGE_EVENTS,
-        groupId = KafkaConsumerGroups.DABOM_API_CORE_REALTIME,
-        containerFactory = "usageKafkaListenerContainerFactory")
-public void consume(ConsumerRecord<String, String> record) {
-    usageRealtimeConsumer.consume(record, kafkaEventMessageSupport);
-}
-```
-
-## 16. 트러블슈팅
-
-### 빈이 잡히지 않을 때
-
-- `scanBasePackages`에 `com.dabom.messaging.kafka`가 포함되어 있는지 확인한다.
-
-### import가 되지 않을 때
-
-- Gradle refresh를 다시 수행한다.
-- JitPack 태그명이 정확한지 확인한다.
-
-### Kafka 설정 빈이 충돌할 때
-
-- 서비스 내부에 동일한 타입의 Kafka 설정 빈이 중복 선언되어 있는지 확인한다.
-- 특히 `KafkaTemplate`, `ConsumerFactory`, `CommonErrorHandler` 중복 여부를 먼저 본다.
-
+- producer success/error 메트릭 증가 여부
+- consumer success/retry/dlt 메트릭 증가 여부
+- DLT 발행 시 헤더 포함 여부
