@@ -23,9 +23,4 @@ public class DefaultKafkaEventPublisher implements KafkaEventPublisher {
     public <T> void publish(String topic, String eventType, T payload) {
         publish(topic, EventEnvelope.of(eventType, payload));
     }
-
-    @Override
-    public <T> void publish(String topic, String eventType, String subType, T payload) {
-        publish(topic, EventEnvelope.of(eventType, subType, payload));
-    }
 }
