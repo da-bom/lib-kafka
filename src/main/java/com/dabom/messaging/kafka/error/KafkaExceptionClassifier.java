@@ -41,6 +41,11 @@ public class KafkaExceptionClassifier {
             return new KafkaErrorDecision(KafkaErrorAction.RETRY, KafkaErrorCode.TRANSIENT_DB);
         }
 
+        if (hasCause(throwable, NonRetryableKafkaMessageProcessingException.class)) {
+            return new KafkaErrorDecision(
+                    KafkaErrorAction.DLQ, KafkaErrorCode.NON_RETRYABLE_PROCESSING_FAILED);
+        }
+
         if (hasCause(throwable, KafkaMessageProcessingException.class)) {
             return new KafkaErrorDecision(KafkaErrorAction.RETRY, KafkaErrorCode.PROCESSING_FAILED);
         }

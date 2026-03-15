@@ -4,7 +4,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.header.internals.RecordHeaders;
@@ -22,13 +21,11 @@ import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
 import org.springframework.util.backoff.BackOff;
 import org.springframework.util.backoff.FixedBackOff;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.dabom.messaging.kafka.error.KafkaErrorAction;
 import com.dabom.messaging.kafka.error.KafkaErrorDecision;
 import com.dabom.messaging.kafka.error.KafkaExceptionClassifier;
-import com.dabom.messaging.kafka.metrics.KafkaMetricTagSanitizer;
 import com.dabom.messaging.kafka.metrics.KafkaMetrics;
+import com.dabom.messaging.kafka.support.KafkaEventMetadataExtractor;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +37,7 @@ public class KafkaErrorHandlerConfig {
     private static final String UNKNOWN_GROUP = "unknown";
 
     private final KafkaMetrics kafkaMetrics;
-    private final ObjectMapper objectMapper;
+    private final KafkaEventMetadataExtractor kafkaEventMetadataExtractor;
     private final KafkaExceptionClassifier kafkaExceptionClassifier;
 
     @Value("${spring.kafka.bootstrap-servers:localhost:9092}")
@@ -60,11 +57,9 @@ public class KafkaErrorHandlerConfig {
 
     @Bean
     public CommonErrorHandler kafkaCommonErrorHandler() {
-        // DLT 발행도 문자열 payload 기준으로 통일한다.
         KafkaTemplate<String, String> dltKafkaTemplate =
                 new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(dltProducerConfig()));
 
-        // 기본 규칙은 원본 topic 이름에 .DLT를 붙인다.
         DeadLetterPublishingRecoverer deadLetterPublishingRecoverer =
                 new DeadLetterPublishingRecoverer(
                         dltKafkaTemplate,
@@ -73,7 +68,6 @@ public class KafkaErrorHandlerConfig {
                                         consumerRecord.topic() + ".DLT",
                                         consumerRecord.partition()));
 
-        // 분류 결과를 헤더에 남겨 운영/분석 시 원인 추적이 가능하게 한다.
         deadLetterPublishingRecoverer.setHeadersFunction(
                 (consumerRecord, exception) -> {
                     KafkaErrorDecision decision = kafkaExceptionClassifier.classify(exception);
@@ -87,11 +81,11 @@ public class KafkaErrorHandlerConfig {
                     return headers;
                 });
 
-        // IGNORE는 DLT 없이 메트릭만 남기고 종료한다.
         ConsumerRecordRecoverer recoverer =
                 (consumerRecord, exception) -> {
                     KafkaErrorDecision decision = kafkaExceptionClassifier.classify(exception);
-                    String eventType = extractEventType(consumerRecord);
+                    String eventType =
+                            kafkaEventMetadataExtractor.extractNormalizedEventType(consumerRecord);
 
                     if (decision.action() == KafkaErrorAction.IGNORE) {
                         kafkaMetrics.incrementInvalidEvent(
@@ -109,30 +103,23 @@ public class KafkaErrorHandlerConfig {
                     kafkaMetrics.incrementDlt(consumerRecord.topic(), UNKNOWN_GROUP, eventType);
                 };
 
-        // 기본 재시도 backoff는 exponential 전략을 사용한다.
-        ExponentialBackOffWithMaxRetries backOff =
-                new ExponentialBackOffWithMaxRetries(maxRetryAttempts);
-        backOff.setInitialInterval(retryInitialIntervalMs);
-        backOff.setMultiplier(retryMultiplier);
-        backOff.setMaxInterval(retryMaxIntervalMs);
-
-        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, backOff);
+        DefaultErrorHandler errorHandler =
+                new DefaultErrorHandler(recoverer, createRetryBackOff());
         errorHandler.setBackOffFunction(
                 (consumerRecord, exception) -> {
                     KafkaErrorDecision decision = kafkaExceptionClassifier.classify(exception);
-                    // RETRY만 backoff를 적용하고 나머지는 즉시 recoverer로 넘긴다.
                     if (decision.action() == KafkaErrorAction.RETRY) {
                         return createRetryBackOff();
                     }
                     return new FixedBackOff(0L, 0L);
                 });
         errorHandler.setRetryListeners(
-                // 재시도 횟수는 메트릭으로 집계한다.
                 (consumerRecord, exception, deliveryAttempt) ->
                         kafkaMetrics.incrementRetryableError(
                                 consumerRecord.topic(),
                                 UNKNOWN_GROUP,
-                                extractEventType(consumerRecord)));
+                                kafkaEventMetadataExtractor.extractNormalizedEventType(
+                                        consumerRecord)));
         errorHandler.setCommitRecovered(true);
 
         return errorHandler;
@@ -144,23 +131,6 @@ public class KafkaErrorHandlerConfig {
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         return config;
-    }
-
-    private String extractEventType(ConsumerRecord<?, ?> consumerRecord) {
-        Object rawValue = consumerRecord.value();
-        if (!(rawValue instanceof String payload) || payload.isBlank()) {
-            return KafkaMetricTagSanitizer.UNKNOWN_EVENT_TYPE;
-        }
-
-        try {
-            JsonNode root = objectMapper.readTree(payload);
-            String rawEventType =
-                    root.path("eventType").asText(KafkaMetricTagSanitizer.UNKNOWN_EVENT_TYPE);
-            return KafkaMetricTagSanitizer.normalizeEventType(rawEventType);
-        } catch (Exception exception) {
-            // 태그 추출 실패가 에러 핸들러 동작 자체를 깨뜨리면 안 된다.
-            return KafkaMetricTagSanitizer.UNKNOWN_EVENT_TYPE;
-        }
     }
 
     private BackOff createRetryBackOff() {

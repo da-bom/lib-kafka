@@ -11,6 +11,7 @@ public enum KafkaErrorCode {
     DESERIALIZATION_FAILED,
     // 비즈니스 처리 단계에서 실패했다.
     PROCESSING_FAILED,
+    NON_RETRYABLE_PROCESSING_FAILED,
     // 분류 규칙에 없는 예외다.
     UNKNOWN
 }
