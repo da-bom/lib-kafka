@@ -1,9 +1,10 @@
 package com.dabom.messaging.kafka.event.dto.notification;
 
 public enum NotificationType {
+    QUOTA_UPDATED,
     THRESHOLD_ALERT,
-    BLOCKED,
-    UNBLOCKED,
+    CUSTOMER_BLOCKED,
+    CUSTOMER_UNBLOCKED,
     POLICY_CHANGED,
     MISSION_CREATED,
     REWARD_REQUESTED,
